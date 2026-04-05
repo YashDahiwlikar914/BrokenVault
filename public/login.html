@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="forest">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Broken Vault - Login</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+</head>
+
+
+<body class="min-h-screen flex items-center justify-center">
+     <div class="badge badge-error absolute top-4 right-4">Vulnerable Mode</div>
+    <fieldset class="fieldset bg-base-200 border-base-300 rounded-box w-xs border p-4">
+        <legend class="fieldset-legend">Login</legend>
+
+        <label class="label">Username</label>
+        <input type="text" id="username" class="input" placeholder="Username" />
+
+        <label class="label">Password</label>
+        <input type="password" id="password" class="input" placeholder="Password" />
+
+        <button class="btn btn-neutral mt-4" onclick="login()">Login</button>
+    </fieldset>
+</body>
+
+<script>
+    async function login() {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        const res = await fetch('/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                username,
+                password
+            })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            sessionStorage.setItem('userId', data.userId);
+            window.location.href = 'notes.html';
+        } else {
+            alert(data.message);
+        }
+    }
+</script>
+
+</html>
