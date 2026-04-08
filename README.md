@@ -1,80 +1,75 @@
 # BrokenVault
 
-BrokenVault is a deliberately insecure OWASP demo app built with Node.js, Express, SQLite, and static HTML pages styled with DaisyUI/Tailwind.
+BrokenVault is a deliberately broken web app. It ships with real, working vulnerabilities so you can study and demo OWASP attack patterns without setting up anything complex.
 
-## Current Stack
+Built with Node.js, Express, SQLite, and static HTML styled with DaisyUI and Tailwind.
+
+## Stack
 
 - Backend: Node.js + Express
 - Database: SQLite via `database.db`
 - Frontend: static HTML in `public/`
-- Runtime mode: vulnerable and secure modes with observability
+- Runtime: toggleable between vulnerable and secure mode, with observability built in
 
-Notes for this branch:
+## Notes on This Branch
 
-- `SECURE_MODE` controls the initial runtime mode and can be toggled server-side while the app is running.
-- `mysql2` is installed but is not used by runtime code.
-- Docker files are not present in this repo.
-- The notes page includes payload chips, live stats, a last-query panel, and secure-mode safe rendering.
+`SECURE_MODE` sets the initial runtime mode. You can flip it while the app is running without restarting. `mysql2` is installed but unused at runtime. No Docker files are included.
 
-## Local Setup
+## Setup
 
 1. Install Node.js 20.
-2. Install dependencies:
+2. Install dependencies.
 
 ```bash
 npm install
 ```
 
-3. Create your local env file:
+3. Copy the example env file.
 
 ```bash
 cp .env.example .env
 ```
 
-4. Start the app in development:
+4. Start the dev server.
 
 ```bash
 npm run dev
 ```
 
-5. Open:
+5. Open the app at `http://localhost:3000/login.html`.
 
-```text
-http://localhost:3000/login.html
-```
+## Scripts
 
-## Available Scripts
+- `npm start` runs the server with Node
+- `npm run dev` runs the server with Nodemon
+- `npm run build:css` watches Tailwind output
+- `npm run build:css:prod` generates minified Tailwind CSS
 
-- `npm start` - run the server with Node
-- `npm run dev` - run the server with Nodemon
-- `npm run build:css` - watch Tailwind CSS output
-- `npm run build:css:prod` - generate minified Tailwind CSS
+## Key Files
 
-## Important Files
+- `server.js` bootstraps Express, creates the schema, and seeds the admin account
+- `db.js` handles the SQLite connection and Promise wrappers
+- `routes/auth.js` has the vulnerable login route and the secure registration and login routes
+- `routes/notes.js` has vulnerable and secure CRUD and search for notes
+- `routes/config.js` handles config and the mode toggle
+- `public/login.html` is the login page, including secure registration
+- `public/notes.html` is the notes UI with observability and mode-aware rendering
 
-- `server.js` - Express bootstrapping, schema creation, admin seeding
-- `db.js` - SQLite connection and Promise wrappers
-- `routes/auth.js` - vulnerable login plus secure registration/login routes
-- `routes/notes.js` - vulnerable and secure notes CRUD/search routes
-- `routes/config.js` - config and mode toggle endpoints
-- `public/login.html` - login page plus secure registration
-- `public/notes.html` - notes UI with observability and mode-aware rendering
+## Verification Checklist
 
-## Verification
-
-After setup, check that:
+After setup, confirm the following work:
 
 - `npm run dev` starts without errors
 - `POST /login` can be bypassed with `' OR '1'='1' --`
 - `GET /notes/search` accepts UNION-style injection payloads
 - `GET /stats` returns non-zero counters after attack attempts
-- `GET /last-query` shows the most recent tracked SQL statement
-- stored XSS executes when malicious note content is rendered
-- `POST /toggle-mode` flips the app into secure mode
-- secure-mode login bypass attempts fail
+- `GET /last-query` shows the last tracked SQL statement
+- Stored XSS fires when malicious note content is rendered
+- `POST /toggle-mode` switches the app into secure mode
+- Login bypass attempts fail in secure mode
 - `POST /register` creates bcrypt-hashed users in secure mode
-- the app loads at `/login.html`
+- The app loads at `/login.html`
 
-## Security Warning
+## Warning
 
-This project is intentionally insecure for learning and demo purposes. Do not deploy it as-is to any real environment.
+This app is intentionally insecure. Do not deploy it to any real environment.
