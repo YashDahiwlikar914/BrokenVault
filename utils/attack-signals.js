@@ -1,3 +1,5 @@
+const { getMode } = require('./mode');
+
 function normalizeValues(values) {
   return values
     .filter((value) => value !== undefined && value !== null)
@@ -34,10 +36,6 @@ function hasXssSignal(values) {
   return normalizeValues(values).some((value) =>
     xssPatterns.some((pattern) => pattern.test(value))
   );
-}
-
-function getMode() {
-  return process.env.SECURE_MODE === 'true' ? 'secure' : 'vulnerable';
 }
 
 module.exports = {

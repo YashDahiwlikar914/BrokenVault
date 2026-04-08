@@ -10,6 +10,7 @@ app.get('/', (req, res) => res.send('Broken Vault is running'));
 app.use('/', require('./routes/auth'));
 app.use('/', require('./routes/notes'));
 app.use('/', require('./routes/observability'));
+app.use('/', require('./routes/config'));
 
 app.use(express.static('public'));
 

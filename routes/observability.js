@@ -24,7 +24,8 @@ app.get('/stats', asyncHandler(async (req, res) => {
   res.json({
     sqlInjectionCount: stats.sqlInjectionCount || 0,
     xssCount: stats.xssCount || 0,
-    loginBypassCount: stats.loginBypassCount || 0
+    loginBypassCount: stats.loginBypassCount || 0,
+    mode: require('../utils/mode').getMode()
   });
 }));
 

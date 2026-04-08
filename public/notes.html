@@ -10,7 +10,10 @@
 </head>
 
 <body class="min-h-screen p-8">
-    <div class="badge badge-error absolute top-4 right-4">Vulnerable Mode</div>
+    <div class="absolute top-4 right-4 flex items-center gap-2">
+        <div id="modeBadge" class="badge badge-error">Vulnerable Mode</div>
+        <button id="modeToggleButton" class="btn btn-xs btn-outline" onclick="toggleMode()">Enable Secure Mode</button>
+    </div>
 
     <h1 class="text-3xl font-bold mb-6 text-center">My Notes</h1>
 
@@ -106,6 +109,7 @@
 
 <script>
     const userId = sessionStorage.getItem('userId');
+    let currentConfig = { secureMode: false, mode: 'vulnerable' };
     const payloads = {
         unionSearch: {
             description: 'Filled the search box with a UNION payload for credential extraction.',
@@ -127,9 +131,46 @@
             window.location.href = 'login.html';
             return;
         }
+        await loadConfig();
         await loadNotes();
         await refreshObservability();
     };
+
+    async function loadConfig() {
+        const res = await fetch('/config');
+        currentConfig = await res.json();
+        applyMode(currentConfig);
+    }
+
+    function applyMode(config) {
+        const badge = document.getElementById('modeBadge');
+        const button = document.getElementById('modeToggleButton');
+        const payloadStatus = document.getElementById('payloadStatus');
+
+        badge.textContent = config.secureMode ? 'Secure Mode' : 'Vulnerable Mode';
+        badge.className = config.secureMode ? 'badge badge-success' : 'badge badge-error';
+        button.textContent = config.secureMode ? 'Enable Vulnerable Mode' : 'Enable Secure Mode';
+        payloadStatus.textContent = config.secureMode
+            ? 'Secure mode is active. Payload chips still fill the fields so you can verify that attacks no longer execute.'
+            : 'Choose a payload to auto-fill the search bar or note form.';
+    }
+
+    async function toggleMode() {
+        const res = await fetch('/toggle-mode', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                secureMode: !currentConfig.secureMode
+            })
+        });
+
+        currentConfig = await res.json();
+        applyMode(currentConfig);
+        await loadNotes();
+        await refreshObservability();
+    }
 
     async function loadNotes() {
         const res = await fetch(`/notes?userId=${userId}`);
@@ -140,6 +181,34 @@
     function renderNotes(notes) {
         const tbody = document.getElementById('notesTable');
         tbody.innerHTML = '';
+
+        if (currentConfig.secureMode) {
+            notes.forEach(note => {
+                const row = document.createElement('tr');
+                const idCell = document.createElement('td');
+                const titleCell = document.createElement('td');
+                const contentCell = document.createElement('td');
+                const actionCell = document.createElement('td');
+                const deleteButton = document.createElement('button');
+
+                idCell.textContent = note.id;
+                titleCell.textContent = note.title;
+                contentCell.textContent = note.content;
+
+                deleteButton.className = 'btn btn-error btn-soft';
+                deleteButton.textContent = 'Delete';
+                deleteButton.addEventListener('click', () => deleteNote(note.id));
+                actionCell.appendChild(deleteButton);
+
+                row.appendChild(idCell);
+                row.appendChild(titleCell);
+                row.appendChild(contentCell);
+                row.appendChild(actionCell);
+                tbody.appendChild(row);
+            });
+            return;
+        }
+
         notes.forEach(note => {
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -182,6 +251,11 @@
         document.getElementById('injectionCount').textContent = stats.sqlInjectionCount ?? 0;
         document.getElementById('xssCount').textContent = stats.xssCount ?? 0;
         document.getElementById('bypassCount').textContent = stats.loginBypassCount ?? 0;
+
+        if (stats.mode) {
+            currentConfig = { ...currentConfig, mode: stats.mode, secureMode: stats.mode === 'secure' };
+            applyMode(currentConfig);
+        }
     }
 
     async function loadLastQuery() {

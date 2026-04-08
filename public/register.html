@@ -4,11 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Broken Vault - Login</title>
+    <title>Broken Vault - Register</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
 </head>
-
 
 <body class="min-h-screen flex items-center justify-center">
     <div class="absolute top-4 right-4 flex items-center gap-2">
@@ -18,17 +17,18 @@
 
     <div class="flex flex-col gap-4 w-full max-w-md px-4">
         <fieldset class="fieldset bg-base-200 border-base-300 rounded-box border p-4">
-            <legend class="fieldset-legend">Login</legend>
+            <legend class="fieldset-legend">Secure Registration</legend>
+
+            <p id="registerHelpText" class="text-sm opacity-75">Switch to secure mode to create a new account.</p>
 
             <label class="label">Username</label>
-            <input type="text" id="username" class="input" placeholder="Username" />
+            <input type="text" id="registerUsername" class="input" placeholder="New username" />
 
             <label class="label">Password</label>
-            <input type="password" id="password" class="input" placeholder="Password" />
+            <input type="password" id="registerPassword" class="input" placeholder="New password" />
 
-            <button class="btn btn-neutral mt-4" onclick="login()">Login</button>
-            <p id="loginHelpText" class="text-xs opacity-70 mt-2">Use the seeded admin account in vulnerable mode, or register a secure user after toggling secure mode on.</p>
-            <a id="registerLink" href="register.html" class="btn btn-link px-0 hidden">Go to Secure Registration</a>
+            <button id="registerButton" class="btn btn-primary mt-4" onclick="register()">Register Secure User</button>
+            <a href="login.html" class="btn btn-link px-0">Back to Login</a>
         </fieldset>
     </div>
 </body>
@@ -49,16 +49,16 @@
     function applyMode(config) {
         const badge = document.getElementById('modeBadge');
         const button = document.getElementById('modeToggleButton');
-        const helpText = document.getElementById('loginHelpText');
-        const registerLink = document.getElementById('registerLink');
+        const helpText = document.getElementById('registerHelpText');
+        const registerButton = document.getElementById('registerButton');
 
         badge.textContent = config.secureMode ? 'Secure Mode' : 'Vulnerable Mode';
         badge.className = config.secureMode ? 'badge badge-success' : 'badge badge-error';
         button.textContent = config.secureMode ? 'Enable Vulnerable Mode' : 'Enable Secure Mode';
-        registerLink.classList.toggle('hidden', !config.secureMode);
         helpText.textContent = config.secureMode
-            ? 'Secure mode uses bcrypt verification. Go to the dedicated registration page to create a secure user, then come back here to log in.'
-            : 'Vulnerable mode uses the seeded admin account and intentionally insecure login behavior.';
+            ? 'Secure mode is active. Create a new account here, then return to the login page.'
+            : 'Registration is disabled in vulnerable mode. Toggle secure mode on first.';
+        registerButton.disabled = !config.secureMode;
     }
 
     async function toggleMode() {
@@ -77,11 +77,11 @@
         alert(`Mode switched to ${currentConfig.mode}`);
     }
 
-    async function login() {
-        const username = document.getElementById('username').value;
-        const password = document.getElementById('password').value;
+    async function register() {
+        const username = document.getElementById('registerUsername').value;
+        const password = document.getElementById('registerPassword').value;
 
-        const res = await fetch('/login', {
+        const res = await fetch('/register', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -93,12 +93,14 @@
         });
 
         const data = await res.json();
-        if (data.success) {
-            sessionStorage.setItem('userId', data.userId);
-            window.location.href = 'notes.html';
-        } else {
-            alert(data.message);
+
+        if (!res.ok || !data.success) {
+            alert(data.message || 'Registration failed');
+            return;
         }
+
+        alert(`Registered secure user ${data.username}. Redirecting to login.`);
+        window.location.href = 'login.html';
     }
 </script>
 

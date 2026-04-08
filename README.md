@@ -7,14 +7,14 @@ BrokenVault is a deliberately insecure OWASP demo app built with Node.js, Expres
 - Backend: Node.js + Express
 - Database: SQLite via `database.db`
 - Frontend: static HTML in `public/`
-- Runtime mode: vulnerable baseline with observability
+- Runtime mode: vulnerable and secure modes with observability
 
 Notes for this branch:
 
-- `SECURE_MODE` exists in env config but is not wired on the server yet.
+- `SECURE_MODE` controls the initial runtime mode and can be toggled server-side while the app is running.
 - `mysql2` is installed but is not used by runtime code.
 - Docker files are not present in this repo.
-- The notes page includes payload chips, live stats, and a last-query panel for demos.
+- The notes page includes payload chips, live stats, a last-query panel, and secure-mode safe rendering.
 
 ## Local Setup
 
@@ -54,10 +54,11 @@ http://localhost:3000/login.html
 
 - `server.js` - Express bootstrapping, schema creation, admin seeding
 - `db.js` - SQLite connection and Promise wrappers
-- `routes/auth.js` - vulnerable login route
-- `routes/notes.js` - vulnerable notes CRUD/search routes
-- `public/login.html` - login page
-- `public/notes.html` - notes UI
+- `routes/auth.js` - vulnerable login plus secure registration/login routes
+- `routes/notes.js` - vulnerable and secure notes CRUD/search routes
+- `routes/config.js` - config and mode toggle endpoints
+- `public/login.html` - login page plus secure registration
+- `public/notes.html` - notes UI with observability and mode-aware rendering
 
 ## Verification
 
@@ -69,6 +70,9 @@ After setup, check that:
 - `GET /stats` returns non-zero counters after attack attempts
 - `GET /last-query` shows the most recent tracked SQL statement
 - stored XSS executes when malicious note content is rendered
+- `POST /toggle-mode` flips the app into secure mode
+- secure-mode login bypass attempts fail
+- `POST /register` creates bcrypt-hashed users in secure mode
 - the app loads at `/login.html`
 
 ## Security Warning
