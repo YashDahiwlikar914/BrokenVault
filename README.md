@@ -1,7 +1,6 @@
 # BrokenVault
 
 BrokenVault is a deliberately broken web app. It ships with real, working vulnerabilities so you can study and demo OWASP attack patterns without setting up anything complex.
-
 Built with Node.js, Express, SQLite, and static HTML styled with DaisyUI and Tailwind.
 
 ## Stack
