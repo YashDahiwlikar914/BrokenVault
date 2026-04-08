@@ -41,6 +41,35 @@
         </div>
     </div>
 
+    <div class="grid gap-4 mb-6 lg:grid-cols-2">
+        <div class="card bg-base-200 shadow-sm">
+            <div class="card-body">
+                <div class="flex items-center justify-between gap-4">
+                    <h2 class="card-title">Exploit Console</h2>
+                    <span class="text-xs opacity-70">Click a chip to fill the demo inputs.</span>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                    <button class="btn btn-sm btn-error btn-outline" onclick="applyPayload('unionSearch')">UNION Search</button>
+                    <button class="btn btn-sm btn-warning btn-outline" onclick="applyPayload('tautologySearch')">Tautology Search</button>
+                    <button class="btn btn-sm btn-info btn-outline" onclick="applyPayload('storedXss')">Stored XSS Note</button>
+                </div>
+
+                <p id="payloadStatus" class="text-sm opacity-75">Choose a payload to auto-fill the search bar or note form.</p>
+            </div>
+        </div>
+
+        <div class="card bg-base-200 shadow-sm">
+            <div class="card-body">
+                <div class="flex items-center justify-between gap-4">
+                    <h2 class="card-title">Last Query</h2>
+                    <button class="btn btn-xs btn-ghost" onclick="refreshObservability()">Refresh</button>
+                </div>
+                <pre id="lastQueryPanel" class="bg-neutral text-neutral-content rounded-box p-4 text-xs whitespace-pre-wrap break-words min-h-32">No tracked queries yet.</pre>
+            </div>
+        </div>
+    </div>
+
     <!-- Notes Table -->
     <div class="overflow-x-auto">
         <table class="table table-zebra">
@@ -77,6 +106,21 @@
 
 <script>
     const userId = sessionStorage.getItem('userId');
+    const payloads = {
+        unionSearch: {
+            description: 'Filled the search box with a UNION payload for credential extraction.',
+            search: `' UNION SELECT username, password, 1 FROM users --`
+        },
+        tautologySearch: {
+            description: 'Filled the search box with a tautology payload to demonstrate broad matching.',
+            search: `' OR '1'='1' --`
+        },
+        storedXss: {
+            description: 'Filled the note form with a stored XSS payload.',
+            title: 'Vault breach demo',
+            content: `<svg onload=alert(1)>`
+        }
+    };
 
     window.onload = async function () {
         if (!userId) {
@@ -84,6 +128,7 @@
             return;
         }
         await loadNotes();
+        await refreshObservability();
     };
 
     async function loadNotes() {
@@ -107,11 +152,50 @@
         });
     }
 
+    function applyPayload(key) {
+        const payload = payloads[key];
+        if (!payload) return;
+
+        if (payload.search) {
+            document.getElementById('searchInput').value = payload.search;
+        }
+
+        if (payload.title) {
+            document.getElementById('noteTitle').value = payload.title;
+        }
+
+        if (payload.content) {
+            document.getElementById('noteContent').value = payload.content;
+        }
+
+        document.getElementById('payloadStatus').textContent = payload.description;
+    }
+
+    async function refreshObservability() {
+        await Promise.all([loadStats(), loadLastQuery()]);
+    }
+
+    async function loadStats() {
+        const res = await fetch('/stats');
+        const stats = await res.json();
+
+        document.getElementById('injectionCount').textContent = stats.sqlInjectionCount ?? 0;
+        document.getElementById('xssCount').textContent = stats.xssCount ?? 0;
+        document.getElementById('bypassCount').textContent = stats.loginBypassCount ?? 0;
+    }
+
+    async function loadLastQuery() {
+        const res = await fetch('/last-query');
+        const data = await res.json();
+        document.getElementById('lastQueryPanel').textContent = data.query || 'No tracked queries yet.';
+    }
+
     async function searchNotes() {
         const q = document.getElementById('searchInput').value;
         const res = await fetch(`/notes/search?userId=${userId}&q=${q}`);
         const notes = await res.json();
         renderNotes(notes);
+        await refreshObservability();
     }
 
     async function createNote() {
@@ -123,7 +207,7 @@
             return;
         }
 
-        await fetch('/notes', {
+        const res = await fetch('/notes', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -131,10 +215,17 @@
             body: JSON.stringify({ userId: parseInt(userId), title, content })
         });
 
+        if (!res.ok) {
+            const errorText = await res.text();
+            alert(`Failed to create note: ${errorText || res.status}`);
+            return;
+        }
+
         document.getElementById('noteTitle').value = '';
         document.getElementById('noteContent').value = '';
         
         await loadNotes();
+        await refreshObservability();
     }
 
     async function deleteNote(noteId) {
@@ -145,6 +236,7 @@
         });
         
         await loadNotes();
+        await refreshObservability();
     }
 </script>
 

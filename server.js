@@ -9,6 +9,7 @@ app.get('/', (req, res) => res.send('Broken Vault is running'));
 
 app.use('/', require('./routes/auth'));
 app.use('/', require('./routes/notes'));
+app.use('/', require('./routes/observability'));
 
 app.use(express.static('public'));
 
@@ -43,6 +44,11 @@ db.serialize(() => {
       console.log('Admin user created');
     }
   });
+});
+
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
 app.listen(process.env.PORT, () => {

@@ -10,11 +10,9 @@ The app is intentionally vulnerable and used for OWASP demonstrations.
 - Backend: Node.js + Express
 - Database: SQLite3 file (`database.db`) via `db.js`
 - Frontend: static HTML + DaisyUI/Tailwind via CDN
-- Runtime mode: vulnerable baseline (secure mode not implemented yet)
+- Runtime mode: vulnerable and secure modes both implemented server-side
 
 ### Not currently implemented
-- Server-side secure mode toggle (`/toggle-mode`, `/config`)
-- Secure route branches (parameterized SQL + bcrypt + DOMPurify)
 - Docker files (`Dockerfile`, `docker-compose.yml`)
 - MySQL runtime usage (even though `mysql2` is in dependencies)
 
@@ -22,7 +20,7 @@ The app is intentionally vulnerable and used for OWASP demonstrations.
 
 | OWASP Risk | Current attack surface | Status |
 |---|---|---|
-| A03 - Injection (SQLi) | Raw string interpolation in `/login` and `/notes/search` | Implemented (vulnerable) |
+| A03 - Injection (SQLi) | Raw string interpolation in `/login` and notes routes (`POST /notes`, `GET /notes`, `GET /notes/search`, `DELETE /notes/:id`) | Implemented (vulnerable) |
 | A03 - Injection (XSS) | Raw note content rendered directly in table cell HTML | Implemented (vulnerable) |
 | A07 - Identification Failures | Seeded admin credential stored in plain text | Implemented (vulnerable) |
 
@@ -37,15 +35,23 @@ The app is intentionally vulnerable and used for OWASP demonstrations.
   - SQLite connection
   - Promise helpers: `query(sql, params)` and `runQuery(sql, params)`
 - `routes/auth.js`
-  - `POST /login` with vulnerable SQL string concatenation
+  - `POST /login` with vulnerable and secure authentication branches
+  - `POST /register` for secure-mode bcrypt registration
 - `routes/notes.js`
   - `POST /notes`, `GET /notes`, `GET /notes/search`, `DELETE /notes/:id`
-  - Vulnerable SQL usage in create/list/search/delete
+  - Vulnerable SQL paths plus secure parameterized/sanitized branches
+- `routes/observability.js`
+  - `GET /stats` for audit-log-backed counters
+  - `GET /last-query` for the most recent tracked SQL statement
+- `routes/config.js`
+  - `GET /config` for frontend mode awareness
+  - `POST /toggle-mode` for switching between vulnerable and secure modes
 - `public/login.html`
-  - Login form, stores `userId` in `sessionStorage`
+  - Login form, secure registration form, and mode toggle
 - `public/notes.html`
   - Notes table + create/search/delete interactions
-  - Content rendered through `innerHTML` in row template
+  - Exploit payload chips, live stats cards, and last-query panel
+  - Vulnerable `innerHTML` rendering in vulnerable mode and safe text rendering in secure mode
 
 ## 4) Local Runbook (Current)
 
@@ -90,6 +96,7 @@ http://localhost:3000/login.html
 
 ### `GET /notes`
 - Returns all notes by `user_id`
+- Uses interpolated `userId` in the SQL query
 
 ### `DELETE /notes/:id`
 - Deletes by interpolated ID
@@ -98,22 +105,16 @@ http://localhost:3000/login.html
 
 These features are referenced in older planning docs but are not yet present in code:
 
-1. Exploit Console payload chips in the UI
-2. Query Log panel + backend `GET /last-query`
-3. Stats endpoints wired to real `audit_log` counts (`GET /stats`)
-4. Secure mode branch logic for every vulnerable route
-5. Password hashing flow (`/register`, bcrypt login verification)
-6. Server-side sanitization path (`isomorphic-dompurify` + safe render)
-7. Docker portability files and workflow
+1. Docker portability files and workflow
 
 ## 7) Forward Plan (Updated)
 
 ## Phase 1 - Vulnerable Baseline (Done)
-- Raw SQL injection surfaces implemented for login/search.
+- Raw SQL injection surfaces implemented for login and notes routes.
 - Stored XSS path implemented (raw store + unsafe render).
 - Plain-text seed credential present for demonstration.
 
-## Phase 2 - Demo Observability (Next)
+## Phase 2 - Demo Observability (Done)
 Goal: make attacks obvious in live demos.
 
 Deliverables:
@@ -127,7 +128,7 @@ Acceptance checks:
 - Query log shows raw SQL string from most recent route
 - Stats cards change after attack attempts
 
-## Phase 3 - Security Patch Mode (Planned)
+## Phase 3 - Security Patch Mode (Done)
 Goal: keep vulnerable and secure behavior side-by-side, controlled server-side.
 
 Deliverables:
@@ -143,7 +144,7 @@ Acceptance checks:
 - Stored XSS payload does not execute in secure mode
 - User passwords in DB are bcrypt hashes in secure mode flow
 
-## Phase 4 - Optional Migration + Containerization (Later)
+## Phase 4 - Optional Migration + Containerization (Next)
 Goal: improve portability and align with MySQL-specific teaching scripts.
 
 Deliverables:
@@ -170,7 +171,13 @@ At any point, `PLAN.md` and `AGENTS.md` must agree on:
 - `npm run dev` starts server without errors.
 - `POST /login` can be bypassed with `' OR '1'='1' --`.
 - `GET /notes/search` accepts UNION-style injection payloads.
+- `GET /stats` returns non-zero counters after attack attempts.
+- `GET /last-query` shows the most recent tracked SQL statement.
 - Stored XSS executes when malicious note content is rendered.
+- `POST /toggle-mode` switches the app into secure mode.
+- Secure-mode login bypass attempts fail.
+- `POST /register` creates bcrypt-hashed users in secure mode.
+- Secure-mode note creation stores sanitized content and renders it safely.
 - `.env` remains ignored by git.
 
 ---
