@@ -45,15 +45,65 @@ npm run dev
 - `npm run build:css` watches Tailwind output
 - `npm run build:css:prod` generates minified Tailwind CSS
 
+## Vulnerability Coverage
+
+| OWASP Risk | Attack Surface |
+|---|---|
+| A03 Injection (SQLi) | Raw string interpolation in `/login` and all notes routes |
+| A03 Injection (XSS) | Raw note content rendered directly into table cell HTML |
+| A07 Identification Failures | Seeded admin credential stored in plain text |
+
+## API Behavior
+
+### `POST /login`
+
+Vulnerable query:
+```sql
+SELECT * FROM users WHERE username = '${username}' AND password='${password}'
+```
+SQLi bypass: use `' OR '1'='1' --` as the password.
+
+### `GET /notes/search?userId=&q=`
+
+Vulnerable query:
+```sql
+SELECT id, title, content FROM notes WHERE user_id = ${userId} AND title LIKE '%${q}%'
+```
+UNION payload: `q=' UNION SELECT username, password, 1 FROM users --`
+
+### `POST /notes`
+
+Inserts raw `title` and `content` into the DB. Stored XSS payload: `<script>alert('Vault Breached')</script>`
+
+### `GET /notes`
+
+Returns all notes for a `user_id`. Uses interpolated `userId` in the query.
+
+### `DELETE /notes/:id`
+
+Deletes by interpolated ID.
+
 ## Key Files
 
 - `server.js` bootstraps Express, creates the schema, and seeds the admin account
 - `db.js` handles the SQLite connection and Promise wrappers
 - `routes/auth.js` has the vulnerable login route and the secure registration and login routes
 - `routes/notes.js` has vulnerable and secure CRUD and search for notes
+- `routes/observability.js` serves `GET /stats` and `GET /last-query`
 - `routes/config.js` handles config and the mode toggle
-- `public/login.html` is the login page, including secure registration
-- `public/notes.html` is the notes UI with observability and mode-aware rendering
+- `public/login.html` is the login page, including secure registration and mode toggle
+- `public/notes.html` is the notes UI with payload chips, live stats cards, a last-query panel, and mode-aware rendering
+
+## Secure Mode
+
+Flipping to secure mode via `POST /toggle-mode` switches the entire app:
+
+- SQL queries move to parameterized `?` placeholders
+- Passwords are verified against bcrypt hashes
+- Note content is sanitized with DOMPurify before storage
+- Client rendering switches from `innerHTML` to safe text rendering
+
+The vulnerable and secure branches live side by side in the same routes, controlled by the server-side flag.
 
 ## Verification Checklist
 
@@ -68,7 +118,8 @@ After setup, confirm the following work:
 - `POST /toggle-mode` switches the app into secure mode
 - Login bypass attempts fail in secure mode
 - `POST /register` creates bcrypt-hashed users in secure mode
-- The app loads at `/login.html`
+- Secure-mode note creation stores sanitized content and renders it safely
+- `.env` is ignored by git
 
 ## Warning
 
