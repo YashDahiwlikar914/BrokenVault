@@ -1,5 +1,5 @@
 const express = require('express');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const app = express.Router();
 const db = require('../db');
 const asyncHandler = require('../utils/async-handler');
