@@ -16,42 +16,47 @@ app.use(express.static('public'));
 
 const db = require('./db');
 
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL,
-    password TEXT NOT NULL
-  )`);
+// Initialize database tables synchronously via our wrapper
+(async function initDb() {
+    try {
+        db.exec(`CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            password TEXT NOT NULL
+        )`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS notes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    title TEXT,
-    content TEXT,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  )`);
+        db.exec(`CREATE TABLE IF NOT EXISTS notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT,
+            content TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS audit_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    event TEXT,
-    payload TEXT,
-    mode TEXT,
-    ts DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
+        db.exec(`CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event TEXT,
+            payload TEXT,
+            mode TEXT,
+            ts DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`);
 
-  db.get("SELECT * FROM users WHERE username = 'admin'", (err, row) => {
-    if (!row) {
-      db.run("INSERT INTO users (username, password) VALUES ('admin', 'password123')");
-      console.log('Admin user created');
+        const [rows] = await db.query("SELECT * FROM users WHERE username = 'admin'");
+        if (rows.length === 0) {
+            await db.runQuery("INSERT INTO users (username, password) VALUES ('admin', 'password123')");
+            console.log('Admin user created');
+        }
+    } catch (err) {
+        console.error('Database initialization failed:', err);
     }
-  });
-});
+})();
 
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ error: err.message || 'Internal server error' });
+    console.error(err.stack);
+    res.status(500).json({ success: false, message: 'Something went wrong!' });
 });
 
-app.listen(process.env.PORT, () => {
-  console.log(`Server listening on port ${process.env.PORT}`);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server listening on port ${PORT}`);
 });

@@ -1,57 +1,64 @@
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 const path = require('path');
 
-const db = new sqlite3.Database(path.join(__dirname, 'database.db'));
+const db = new Database(path.join(__dirname, 'database.db'));
 let lastTrackedQuery = null;
 
-function runAll(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve([rows]);
-    });
-  });
+// Original Promise-based API wrappers for compatibility with existing code
+async function query(sql, params = []) {
+    lastTrackedQuery = { sql, params };
+    try {
+        const rows = db.prepare(sql).all(...params);
+        return [rows, null];
+    } catch (err) {
+        return [[], err];
+    }
 }
 
-function runStatement(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function(err) {
-      if (err) reject(err);
-      else resolve({ changes: this.changes, lastID: this.lastID });
-    });
-  });
+async function runQuery(sql, params = []) {
+    lastTrackedQuery = { sql, params };
+    try {
+        const result = db.prepare(sql).run(...params);
+        return { 
+            lastID: result.lastInsertRowid, 
+            changes: result.changes 
+        };
+    } catch (err) {
+        throw err;
+    }
 }
 
-db.query = function(sql, params = []) {
-  lastTrackedQuery = sql;
-  return runAll(sql, params);
+// Low-level raw query for tracking (XSS/SQLi observability)
+async function rawQuery(sql) {
+    lastTrackedQuery = { sql, params: [] };
+    const rows = db.prepare(sql).all();
+    return rows;
+}
+
+async function rawRunQuery(sql) {
+    lastTrackedQuery = { sql, params: [] };
+    const result = db.prepare(sql).run();
+    return result;
+}
+
+// Observability helpers
+function getLastQuery() {
+    return lastTrackedQuery;
+}
+
+async function logAuditEvent(event, payload, mode) {
+    const sql = 'INSERT INTO audit_log (event, payload, mode) VALUES (?, ?, ?)';
+    return runQuery(sql, [event, JSON.stringify(payload), mode]);
+}
+
+module.exports = {
+    query,
+    runQuery,
+    rawQuery,
+    rawRunQuery,
+    getLastQuery,
+    logAuditEvent,
+    // Add exec for one-off table creations in server.js
+    exec: (sql) => db.exec(sql),
+    prepare: (sql) => db.prepare(sql)
 };
-
-db.runQuery = function(sql, params = []) {
-  lastTrackedQuery = sql;
-  return runStatement(sql, params);
-};
-
-db.rawQuery = function(sql, params = []) {
-  return runAll(sql, params);
-};
-
-db.rawRunQuery = function(sql, params = []) {
-  return runStatement(sql, params);
-};
-
-db.getLastTrackedQuery = function() {
-  return lastTrackedQuery;
-};
-
-db.logAuditEvent = function(event, payload, mode = 'vulnerable') {
-  const serializedPayload =
-    typeof payload === 'string' ? payload : JSON.stringify(payload);
-
-  return runStatement(
-    'INSERT INTO audit_log (event, payload, mode) VALUES (?, ?, ?)',
-    [event, serializedPayload, mode]
-  );
-};
-
-module.exports = db;
