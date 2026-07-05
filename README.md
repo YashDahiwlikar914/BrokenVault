@@ -1,125 +1,103 @@
 # BrokenVault
 
-BrokenVault is a deliberately broken web app. It ships with real, working vulnerabilities so you can study and demo OWASP attack patterns without setting up anything complex.
-Built with Node.js, Express, SQLite, and static HTML styled with DaisyUI and Tailwind.
+**Warning: This app is intentionally insecure. Do not deploy it to any real environment.**
 
-## Stack
+BrokenVault is a deliberately broken web app. It ships with real, working vulnerabilities so you can study and demo OWASP attack patterns without setting up anything complex. The app uses Node.js and Express for the backend, SQLite for the database, and static HTML styled with DaisyUI and Tailwind for the frontend. You can toggle the app between vulnerable and secure modes while it runs.
 
-- Backend: Node.js + Express
-- Database: SQLite via `database.db`
-- Frontend: static HTML in `public/`
-- Runtime: toggleable between vulnerable and secure mode, with observability built in
+## Note
 
-## Notes on This Branch
-
-`SECURE_MODE` sets the initial runtime mode. You can flip it while the app is running without restarting. `mysql2` is installed but unused at runtime. No Docker files are included.
+The `SECURE_MODE` environment variable sets the initial runtime mode. You can flip the mode while the app is running without restarting it. The `mysql2` package is installed but unused. There are no Docker files included.
 
 ## Setup
 
-1. Install Node.js 20.
-2. Install dependencies.
+First, install Node.js 20. Then clone the repository and install the dependencies.
 
 ```bash
 npm install
 ```
 
-3. Copy the example env file.
+Copy the example environment file.
 
 ```bash
 cp .env.example .env
 ```
 
-4. Start the dev server.
+Start the development server.
 
 ```bash
 npm run dev
 ```
 
-5. Open the app at `http://localhost:3000/login.html`.
+Open the app at `http://localhost:3000/login.html`.
 
 ## Scripts
 
-- `npm start` runs the server with Node
-- `npm run dev` runs the server with Nodemon
-- `npm run build:css` watches Tailwind output
-- `npm run build:css:prod` generates minified Tailwind CSS
+| Command | What it does |
+|---|---|
+| `npm start` | Runs the server with Node. |
+| `npm run dev` | Runs the server with Nodemon so it restarts on changes. |
+| `npm run build:css` | Watches Tailwind output and rebuilds on changes. |
+| `npm run build:css:prod` | Generates minified Tailwind CSS for production. |
 
 ## Vulnerability Coverage
 
 | OWASP Risk | Attack Surface |
 |---|---|
-| A03 Injection (SQLi) | Raw string interpolation in `/login` and all notes routes |
-| A03 Injection (XSS) | Raw note content rendered directly into table cell HTML |
-| A07 Identification Failures | Seeded admin credential stored in plain text |
+| A03 Injection (SQLi) | Raw string interpolation in `/login` and all notes routes. |
+| A03 Injection (XSS) | Raw note content rendered directly into table cell HTML. |
+| A07 Identification Failures | Seeded admin credential stored in plain text. |
 
-## API Behavior
+## API Behaviour
 
-### `POST /login`
+The vulnerable routes rely on raw string interpolation. 
 
-Vulnerable query:
+The `POST /login` route builds a query like this:
 ```sql
 SELECT * FROM users WHERE username = '${username}' AND password='${password}'
 ```
-SQLi bypass: use `' OR '1'='1' --` as the password.
+You can bypass it by entering `' OR '1'='1' --` as the password.
 
-### `GET /notes/search?userId=&q=`
-
-Vulnerable query:
+The `GET /notes/search` route searches notes using this query:
 ```sql
 SELECT id, title, content FROM notes WHERE user_id = ${userId} AND title LIKE '%${q}%'
 ```
-UNION payload: `q=' UNION SELECT username, password, 1 FROM users --`
+You can extract user credentials with a UNION payload like `q=' UNION SELECT username, password, 1 FROM users --`.
 
-### `POST /notes`
+The `POST /notes` route inserts raw titles and content directly into the database. You can trigger a stored XSS attack by saving `<script>alert('Vault Breached')</script>` as the note content.
 
-Inserts raw `title` and `content` into the DB. Stored XSS payload: `<script>alert('Vault Breached')</script>`
-
-### `GET /notes`
-
-Returns all notes for a `user_id`. Uses interpolated `userId` in the query.
-
-### `DELETE /notes/:id`
-
-Deletes by interpolated ID.
+The `GET /notes` and `DELETE /notes/:id` routes also use interpolated IDs in their queries, making them vulnerable to SQL injection.
 
 ## Key Files
 
-- `server.js` bootstraps Express, creates the schema, and seeds the admin account
-- `db.js` handles the SQLite connection and Promise wrappers
-- `routes/auth.js` has the vulnerable login route and the secure registration and login routes
-- `routes/notes.js` has vulnerable and secure CRUD and search for notes
-- `routes/observability.js` serves `GET /stats` and `GET /last-query`
-- `routes/config.js` handles config and the mode toggle
-- `public/login.html` is the login page, including secure registration and mode toggle
-- `public/notes.html` is the notes UI with payload chips, live stats cards, a last-query panel, and mode-aware rendering
+| File | Purpose |
+|---|---|
+| `server.js` | Bootstraps Express, creates the schema, and seeds the admin account. |
+| `db.js` | Handles the SQLite connection and Promise wrappers. |
+| `routes/auth.js` | Contains the vulnerable login route and the secure registration and login routes. |
+| `routes/notes.js` | Contains the vulnerable and secure CRUD and search routes for notes. |
+| `routes/observability.js` | Serves `GET /stats` and `GET /last-query`. |
+| `routes/config.js` | Handles configuration and the mode toggle. |
+| `public/login.html` | The login page, which includes secure registration and the mode toggle. |
+| `public/notes.html` | The notes UI. It includes payload chips, live stats cards, a last-query panel, and rendering logic that respects the current security mode. |
 
 ## Secure Mode
 
-Flipping to secure mode via `POST /toggle-mode` switches the entire app:
+Flipping the app to secure mode via `POST /toggle-mode` switches how the app handles data. SQL queries move to parameterized placeholders. Passwords are verified against bcrypt hashes instead of plain text. Note content gets sanitized with DOMPurify before storage. The client switches from `innerHTML` to safe text rendering. 
 
-- SQL queries move to parameterized `?` placeholders
-- Passwords are verified against bcrypt hashes
-- Note content is sanitized with DOMPurify before storage
-- Client rendering switches from `innerHTML` to safe text rendering
-
-The vulnerable and secure branches live side by side in the same routes, controlled by the server-side flag.
+The vulnerable and secure logic live side by side in the same route files. A server-side flag controls which branch executes.
 
 ## Verification Checklist
 
-After setup, confirm the following work:
+After setting up the app, run through these checks to confirm everything works:
 
 - `npm run dev` starts without errors
 - `POST /login` can be bypassed with `' OR '1'='1' --`
 - `GET /notes/search` accepts UNION-style injection payloads
-- `GET /stats` returns non-zero counters after attack attempts
+- `GET /stats` returns non-zero counters after an attack attempt
 - `GET /last-query` shows the last tracked SQL statement
-- Stored XSS fires when malicious note content is rendered
+- Stored XSS fires when malicious note content loads
 - `POST /toggle-mode` switches the app into secure mode
 - Login bypass attempts fail in secure mode
 - `POST /register` creates bcrypt-hashed users in secure mode
-- Secure-mode note creation stores sanitized content and renders it safely
-- `.env` is ignored by git
-
-## Warning
-
-This app is intentionally insecure. Do not deploy it to any real environment.
+- Note creation in secure mode sanitizes content and renders it safely
+- Git ignores the `.env` file
