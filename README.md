@@ -5,6 +5,7 @@
 BrokenVault is a deliberately broken web app. It ships with real, working vulnerabilities so you can study and demo OWASP attack patterns without setting up anything complex. The app uses Node.js and Express for the backend, SQLite for the database, and static HTML styled with DaisyUI and Tailwind for the frontend. You can toggle the app between vulnerable and secure modes while it runs.
 
 ## Note
+Claude helped set up Express and Node, connect the database, style the frontend, and draft this documentation. I designed the vulnerabilities, wrote the exploit payloads, and built the secure and vulnerable modes manually.
 
 The `SECURE_MODE` environment variable sets the initial runtime mode. You can flip the mode while the app is running without restarting it. The `mysql2` package is installed but unused. There are no Docker files included.
 
